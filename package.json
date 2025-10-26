@@ -1,0 +1,18 @@
+{
+  "name": "com.devknit.rp.universal.extension",
+  "displayName": "Knit RP-Universal.Extension",
+  "version": "0.9.0",
+  "unity": "2023.2",
+  "dependencies": {
+    "com.unity.mathematics": "1.2.1",
+    "com.unity.burst": "1.8.9",
+    "com.unity.render-pipelines.core": "16.0.4",
+    "com.unity.shadergraph": "16.0.4",
+    "com.unity.render-pipelines.universal": "16.0.4"
+  },
+  "author": {
+    "name": "Knit",
+    "email": "devknit.yua@gmail.com",
+    "url": "https://github.com/devknit"
+  }
+}

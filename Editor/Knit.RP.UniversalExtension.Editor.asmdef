@@ -1,0 +1,21 @@
+{
+    "name": "Knit.RP.UniversalExtension.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:3eae0364be2026648bf74846acb8a731",
+        "GUID:2f1dfe37e72746342af413402fa304ec",
+        "GUID:5127e14d4573e4740987dfc5580c6664",
+        "GUID:421481a91af9d224198476f5280fa7c6"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
