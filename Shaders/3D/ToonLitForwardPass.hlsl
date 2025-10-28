@@ -46,6 +46,9 @@ struct Varyings
 #if defined(DYNAMICLIGHTMAP_ON)
 	float2 dynamicLightmapUV : TEXCOORD8; // Dynamic lightmap UVs
 #endif
+#ifdef USE_APV_PROBE_OCCLUSION
+    float4 probeOcclusion : TEXCOORD9;
+#endif
 	UNITY_VERTEX_INPUT_INSTANCE_ID
 	UNITY_VERTEX_OUTPUT_STEREO
 };
@@ -53,6 +56,9 @@ void InitializeInputData( Varyings input, half3 normalTS, out InputData inputDat
 {
 	inputData = (InputData)0;
 	inputData.positionWS = input.positionWS;
+#if defined(DEBUG_DISPLAY)
+    inputData.positionCS = input.positionCS;
+#endif
 	
 #if defined(_NORMALMAP)
 	half3 viewDirWS = half3( input.normalWS.w, input.tangentWS.w, input.bitangentWS.w);
@@ -81,20 +87,7 @@ void InitializeInputData( Varyings input, half3 normalTS, out InputData inputDat
 	inputData.fogCoord = InitializeInputDataFog( float4( inputData.positionWS, 1.0), input.fogFactor);
 	inputData.vertexLighting = half3( 0, 0, 0);
 #endif
-	
-#if defined(DYNAMICLIGHTMAP_ON)
-	inputData.bakedGI = SAMPLE_GI( input.staticLightmapUV, input.dynamicLightmapUV, input.vertexSH, inputData.normalWS);
-#elif !defined(LIGHTMAP_ON) && (defined(PROBE_VOLUMES_L1) || defined(PROBE_VOLUMES_L2))
-	inputData.bakedGI = SAMPLE_GI( input.vertexSH,
-		GetAbsolutePositionWS( inputData.positionWS),
-		inputData.normalWS,
-		inputData.viewDirectionWS,
-		input.positionCS.xy);
-#else
-	inputData.bakedGI = SAMPLE_GI( input.staticLightmapUV, input.vertexSH, inputData.normalWS);
-#endif
 	inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV( input.positionCS);
-	inputData.shadowMask = SAMPLE_SHADOWMASK( input.staticLightmapUV);
 	
 #if defined(DEBUG_DISPLAY)
 	#if defined(DYNAMICLIGHTMAP_ON)
@@ -105,6 +98,27 @@ void InitializeInputData( Varyings input, half3 normalTS, out InputData inputDat
 	#else
 		inputData.vertexSH = input.vertexSH;
 	#endif
+	#if defined(USE_APV_PROBE_OCCLUSION)
+		inputData.probeOcclusion = input.probeOcclusion;
+    #endif
+#endif
+}
+void InitializeBakedGIData(Varyings input, inout InputData inputData)
+{
+#if defined(DYNAMICLIGHTMAP_ON)
+    inputData.bakedGI = SAMPLE_GI( input.staticLightmapUV, input.dynamicLightmapUV, input.vertexSH, inputData.normalWS);
+    inputData.shadowMask = SAMPLE_SHADOWMASK( input.staticLightmapUV);
+#elif !defined(LIGHTMAP_ON) && (defined(PROBE_VOLUMES_L1) || defined(PROBE_VOLUMES_L2))
+    inputData.bakedGI = SAMPLE_GI( input.vertexSH,
+        GetAbsolutePositionWS(inputData.positionWS),
+        inputData.normalWS,
+        inputData.viewDirectionWS,
+        input.positionCS.xy,
+        input.probeOcclusion,
+        inputData.shadowMask);
+#else
+    inputData.bakedGI = SAMPLE_GI(input.staticLightmapUV, input.vertexSH, inputData.normalWS);
+    inputData.shadowMask = SAMPLE_SHADOWMASK(input.staticLightmapUV);
 #endif
 }
 Varyings LitPassVertexToon( Attributes input)
@@ -157,7 +171,8 @@ Varyings LitPassVertexToon( Attributes input)
 	output.dynamicLightmapUV = input.dynamicLightmapUV.xy * unity_DynamicLightmapST.xy + unity_DynamicLightmapST.zw;
 #endif
 	OUTPUT_SH4( vertexInput.positionWS, output.normalWS.xyz, 
-		GetWorldSpaceNormalizeViewDir( vertexInput.positionWS), output.vertexSH);
+		GetWorldSpaceNormalizeViewDir( vertexInput.positionWS), 
+		output.vertexSH, output.probeOcclusion);
 	
 #if defined(_ADDITIONAL_LIGHTS_VERTEX)
 	half3 vertexLight = VertexLighting( vertexInput.positionWS, normalInput.normalWS);
@@ -196,7 +211,9 @@ void LitPassFragmentToon( Varyings input, out half4 outColor : SV_Target0
 #endif
 	half4 sphereMapColor = SAMPLE_TEXTURE2D( _SphereMap, sampler_SphereMap, 
 		TransformWorldToViewDir( inputData.normalWS).xy * 0.5 + 0.5);
-	SETUP_DEBUG_TEXTURE_DATA( inputData, input.uv, _BaseMap);
+	SETUP_DEBUG_TEXTURE_DATA( inputData, UNDO_TRANSFORM_TEX( input.uv, _BaseMap));
+	
+	InitializeBakedGIData( input, inputData);
 	
 	half4 color = UniversalFragmentToonShade( inputData, surfaceData, specularData, sphereMapColor.rgb);
 	color.rgb = MixFog( color.rgb, inputData.fogCoord);

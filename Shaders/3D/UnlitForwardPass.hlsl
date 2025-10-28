@@ -112,7 +112,7 @@ void UnlitPassFragment( Varyings input, out half4 outColor : SV_Target0
 	
 	InputData inputData;
 	InitializeInputData( input, inputData);
-	SETUP_DEBUG_TEXTURE_DATA( inputData, input.uv, _BaseMap);
+	SETUP_DEBUG_TEXTURE_DATA( inputData, UNDO_TRANSFORM_TEX( input.uv, _BaseMap))
 	
 	#if defined(_DBUFFER)
 	ApplyDecalToBaseColor( input.positionCS, albedo);
