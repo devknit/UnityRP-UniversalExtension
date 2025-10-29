@@ -3,6 +3,9 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+#if UNITY_6000_0_OR_NEWER || UNITY_2023_3_OR_NEWER
+using UnityEngine.Rendering.RenderGraphModule;
+#endif
 
 namespace Knit.Rendering.Universal
 {
@@ -20,12 +23,62 @@ namespace Knit.Rendering.Universal
 			}
 		#endif
 		}
-		public void Dispose()
+#if UNITY_6000_0_OR_NEWER || UNITY_2023_3_OR_NEWER
+		public override void RecordRenderGraph( RenderGraph renderGraph, ContextContainer frameData)
 		{
-		#if !ENABLE_ALPHA_BLEND
-			m_CopiedColorTarget?.Release();
+			var cameraData = frameData.Get<UniversalCameraData>();
+			
+			if( m_Material == null || (cameraData.camera.cameraType & kInvalidCameraType) != 0)
+			{
+				return;
+			}
+			var volume = VolumeManager.instance.stack.GetComponent( typeof( Volume.SpeedLine)) as Volume.SpeedLine;
+			
+			if( (volume?.ApplyProperties( m_Material) ?? false) == false)
+			{
+				return;
+			}
+			UniversalResourceData resourceData = frameData.Get<UniversalResourceData>();
+			TextureHandle cameraTexture = resourceData.activeColorTexture;
+			
+		#if ENABLE_ALPHA_BLEND
+			using( IRasterRenderGraphBuilder builder = renderGraph.AddRasterRenderPass( kProfilerTag, out PassData passData))
+			{
+				passData.Material = m_Material;
+				builder.SetRenderAttachment( cameraTexture, 0, AccessFlags.Write);
+				builder.SetRenderFunc<PassData>( static (passData, context) =>
+				{
+					Blitter.BlitTexture( context.cmd, Vector2.one, passData.Material, 0);
+				});
+			}
+		#else
+			TextureDesc tempDesc = renderGraph.GetTextureDesc( cameraTexture);
+			tempDesc.name = kTempColorTarget;
+			TextureHandle tempTexture = renderGraph.CreateTexture( tempDesc);
+			
+			using( IRasterRenderGraphBuilder builder = renderGraph.AddRasterRenderPass( kProfilerTag, out PassData passData))
+			{
+				passData.CameraTexture = cameraTexture;
+				passData.Material = m_Material;
+				builder.UseTexture( cameraTexture, AccessFlags.Read);
+				builder.SetRenderAttachment( tempTexture, 0, AccessFlags.Write);
+				builder.SetRenderFunc<PassData>( static (passData, context) =>
+				{
+					Blitter.BlitTexture( context.cmd, passData.CameraTexture, Vector2.one, passData.Material, 0);
+				});
+			}
+			resourceData.cameraColor = tempTexture;
 		#endif
 		}
+		public void Dispose()
+		{
+		}
+		class PassData
+		{
+			public TextureHandle CameraTexture;
+			public Material Material;
+		}
+#else	
 	#if !ENABLE_ALPHA_BLEND
 		public override void Configure( CommandBuffer commandBuffer, RenderTextureDescriptor cameraTextureDescriptor)
         {
@@ -54,22 +107,28 @@ namespace Knit.Rendering.Universal
 			Blitter.BlitTexture( commandBuffer, Vector2.one, m_Material, 0);
 		#else
 			RTHandle cameraColorTarget = cameraData.renderer.cameraColorTargetHandle;
-			StoreBlitter.BlitCameraTexture( commandBuffer, cameraColorTarget, m_CopiedColorTarget, 0, false);
-			StoreBlitter.BlitCameraTexture( commandBuffer, m_CopiedColorTarget, cameraColorTarget, m_Material, 0);
+			Blitter.BlitCameraTexture( commandBuffer, cameraColorTarget, m_CopiedColorTarget, 0, false);
+			Blitter.BlitCameraTexture( commandBuffer, m_CopiedColorTarget, cameraColorTarget, m_Material, 0);
 		#endif
 			context.ExecuteCommandBuffer( commandBuffer);
 			CommandBufferPool.Release( commandBuffer);
 		}
+		public void Dispose()
+		{
+		#if !ENABLE_ALPHA_BLEND
+			m_CopiedColorTarget?.Release();
+		#endif
+		}
+#endif
+		static readonly int kShaderPropertyColorSrcFactor = Shader.PropertyToID( "_ColorSrcFactor");
+		static readonly int kShaderPropertyColorDstFactor = Shader.PropertyToID( "_ColorDstFactor");
 		const CameraType kInvalidCameraType = CameraType.SceneView | CameraType.Preview;
 		const string kProfilerTag = nameof( SpeedLinePass);
 		const string kTempColorTarget = "_SpeedLineTarget";
-	#if ENABLE_ALPHA_BLEND
 		const string kKeywordAlphaBlendOn = "_ALPHA_BLEND_ON";
-		static readonly int kShaderPropertyColorSrcFactor = Shader.PropertyToID( "_ColorSrcFactor");
-		static readonly int kShaderPropertyColorDstFactor = Shader.PropertyToID( "_ColorDstFactor");
-	#else
+        readonly Material m_Material;
+	#if !ENABLE_ALPHA_BLEND
 		RTHandle m_CopiedColorTarget;
 	#endif
-        readonly Material m_Material;
 	}
 }

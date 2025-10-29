@@ -17,7 +17,6 @@ Shader "Hidden/SpeedLine"
 		ZTest Always
 		ZWrite Off
 		Cull Off
-		// Blend SrcAlpha OneMinusSrcAlpha, Zero One
 		Blend [_ColorSrcFactor] [_ColorDstFactor], Zero One
 		
 		Pass

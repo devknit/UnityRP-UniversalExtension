@@ -1,8 +1,5 @@
 ﻿
-using UnityEngine;
-using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
-using UnityEngine.Rendering.Universal.Internal;
 
 namespace Knit.Rendering.Universal
 {
@@ -11,34 +8,12 @@ namespace Knit.Rendering.Universal
 	{
 		public override void Create()
 		{
-			m_RenderTransparentDepthPass ??= new DrawObjectsPass(
-				kTransparentDepthProfilerTag, 
-				new []{ new ShaderTagId( kShaderTagName) },
-				true,
-				RenderPassEvent.BeforeRenderingTransparents, 
-				RenderQueueRange.transparent,
-				(LayerMask)(-1),
-				kDefaultStencilState,
-				kDefaultStencilReference);
+			m_Pass = new TransparentDepthPass();
 		}
 		public override void AddRenderPasses( ScriptableRenderer renderer, ref RenderingData renderingData)
 		{
-			renderer.EnqueuePass( m_RenderTransparentDepthPass);
+			renderer.EnqueuePass( m_Pass);
 		}
-		const string kTransparentDepthProfilerTag = "TransparentDepthPrepass";
-		const string kShaderTagName = "TransparentDepthOnly";
-		DrawObjectsPass m_RenderTransparentDepthPass;
-		
-		static readonly StencilState kDefaultStencilState = new(
-			false, 255, 255,
-			CompareFunction.Always,
-			StencilOp.Keep,
-			StencilOp.Keep,
-			StencilOp.Keep,
-			CompareFunction.Always,
-			StencilOp.Keep,
-			StencilOp.Keep,
-			StencilOp.Keep);
-		const int kDefaultStencilReference = 0;
+		TransparentDepthPass m_Pass;
 	}
 }
