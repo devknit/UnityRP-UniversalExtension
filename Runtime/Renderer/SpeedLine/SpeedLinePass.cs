@@ -1,10 +1,11 @@
-﻿#define ENABLE_ALPHA_BLEND
+﻿// #define ENABLE_ALPHA_BLEND
 
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 #if UNITY_6000_0_OR_NEWER || UNITY_2023_3_OR_NEWER
 using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Rendering.RenderGraphModule.Util;
 #endif
 
 namespace Knit.Rendering.Universal
@@ -60,6 +61,7 @@ namespace Knit.Rendering.Universal
 			{
 				passData.CameraTexture = cameraTexture;
 				passData.Material = m_Material;
+				builder.AllowPassCulling( false);
 				builder.UseTexture( cameraTexture, AccessFlags.Read);
 				builder.SetRenderAttachment( tempTexture, 0, AccessFlags.Write);
 				builder.SetRenderFunc<PassData>( static (passData, context) =>
@@ -67,7 +69,15 @@ namespace Knit.Rendering.Universal
 					Blitter.BlitTexture( context.cmd, passData.CameraTexture, Vector2.one, passData.Material, 0);
 				});
 			}
-			resourceData.cameraColor = tempTexture;
+			/* AfterRenderingPostProcessing 以降であっても、最後のパスであれば cameraColor への代入で済むが、現段階で最後のパスかどうかを判別する手段がなさそう */
+			if( renderPassEvent <= RenderPassEvent.BeforeRenderingPostProcessing)
+			{
+				resourceData.cameraColor = tempTexture;
+			}
+			else
+			{
+				renderGraph.AddCopyPass( tempTexture, cameraTexture);
+			}
 		#endif
 		}
 		public void Dispose()
@@ -75,7 +85,9 @@ namespace Knit.Rendering.Universal
 		}
 		class PassData
 		{
+		#if !ENABLE_ALPHA_BLEND
 			public TextureHandle CameraTexture;
+		#endif
 			public Material Material;
 		}
 #else	

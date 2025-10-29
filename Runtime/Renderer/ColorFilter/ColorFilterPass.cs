@@ -4,6 +4,7 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 #if UNITY_6000_0_OR_NEWER || UNITY_2023_3_OR_NEWER
 using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Rendering.RenderGraphModule.Util;
 #endif
 
 namespace Knit.Rendering.Universal
@@ -48,7 +49,15 @@ namespace Knit.Rendering.Universal
 					Blitter.BlitTexture( context.cmd, passData.CameraTexture, Vector2.one, passData.Material, 0);
 				});
 			}
-			resourceData.cameraColor = tempTexture;
+			/* AfterRenderingPostProcessing 以降であっても、最後のパスであれば cameraColor への代入で済むが、現段階で最後のパスかどうかを判別する手段がなさそう */
+			if( renderPassEvent <= RenderPassEvent.BeforeRenderingPostProcessing)
+			{
+				resourceData.cameraColor = tempTexture;
+			}
+			else
+			{
+				renderGraph.AddCopyPass( tempTexture, cameraTexture);
+			}
 		}
 		public void Dispose()
 		{
